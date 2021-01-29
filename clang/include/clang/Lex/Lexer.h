@@ -21,6 +21,7 @@
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/Signals.h"
 #include <cassert>
 #include <cstdint>
 #include <string>

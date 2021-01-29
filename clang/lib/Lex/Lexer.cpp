@@ -43,6 +43,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <iostream>
 #include <string>
 #include <tuple>
 #include <utility>
@@ -1128,6 +1129,15 @@ static SourceLocation GetMappedTokenLoc(Preprocessor &PP,
 /// offset in the current file.
 SourceLocation Lexer::getSourceLocation(const char *Loc,
                                         unsigned TokLen) const {
+  if (Loc < BufferStart || Loc > BufferEnd) {
+    std::cout << "Loc: " << Loc << "\n";
+    std::cout << "BufferStart: " << BufferStart << "\n";
+    std::cout << "BufferEnd: " << BufferEnd << "\n";
+    std::string back_trace;
+    llvm::raw_string_ostream stream(back_trace);
+    llvm::sys::PrintStackTrace(stream);
+    std::cout << "Backtrace: " << back_trace << "\n";
+  }
   assert(Loc >= BufferStart && Loc <= BufferEnd &&
          "Location out of range for this buffer!");
 
