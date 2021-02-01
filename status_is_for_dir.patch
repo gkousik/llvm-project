@@ -1,0 +1,183 @@
+diff --git a/clang/include/clang/Tooling/DependencyScanning/DependencyScanningFilesystem.h b/clang/include/clang/Tooling/DependencyScanning/DependencyScanningFilesystem.h
+index 7d088134347..6050b99fdb3 100644
+--- a/clang/include/clang/Tooling/DependencyScanning/DependencyScanningFilesystem.h
++++ b/clang/include/clang/Tooling/DependencyScanning/DependencyScanningFilesystem.h
+@@ -149,7 +149,7 @@ public:
+       : ProxyFileSystem(std::move(FS)), SharedCache(SharedCache),
+         PPSkipMappings(PPSkipMappings) {}
+ 
+-  llvm::ErrorOr<llvm::vfs::Status> status(const Twine &Path) override;
++  llvm::ErrorOr<llvm::vfs::Status> status(const Twine &Path, bool isForDir = false) override;
+   llvm::ErrorOr<std::unique_ptr<llvm::vfs::File>>
+   openFileForRead(const Twine &Path) override;
+ 
+@@ -169,7 +169,7 @@ private:
+   }
+ 
+   llvm::ErrorOr<const CachedFileSystemEntry *>
+-  getOrCreateFileSystemEntry(const StringRef Filename);
++  getOrCreateFileSystemEntry(const StringRef Filename, bool isForDir = false);
+ 
+   DependencyScanningFilesystemSharedCache &SharedCache;
+   /// The local cache is used by the worker thread to cache file system queries
+diff --git a/clang/lib/Basic/FileSystemStatCache.cpp b/clang/lib/Basic/FileSystemStatCache.cpp
+index 415a4e2025d..416e3f26dd1 100644
+--- a/clang/lib/Basic/FileSystemStatCache.cpp
++++ b/clang/lib/Basic/FileSystemStatCache.cpp
+@@ -44,7 +44,7 @@ FileSystemStatCache::get(StringRef Path, llvm::vfs::Status &Status,
+   else if (isForDir || !F) {
+     // If this is a directory or a file descriptor is not needed and we have
+     // no cache, just go to the file system.
+-    llvm::ErrorOr<llvm::vfs::Status> StatusOrErr = FS.status(Path);
++    llvm::ErrorOr<llvm::vfs::Status> StatusOrErr = FS.status(Path, isForDir);
+     if (!StatusOrErr) {
+       RetCode = StatusOrErr.getError();
+     } else {
+diff --git a/clang/lib/Tooling/DependencyScanning/DependencyScanningFilesystem.cpp b/clang/lib/Tooling/DependencyScanning/DependencyScanningFilesystem.cpp
+index b1b87e7fa57..1f39847f194 100644
+--- a/clang/lib/Tooling/DependencyScanning/DependencyScanningFilesystem.cpp
++++ b/clang/lib/Tooling/DependencyScanning/DependencyScanningFilesystem.cpp
+@@ -151,7 +151,7 @@ static bool shouldCacheStatFailures(StringRef Filename) {
+ 
+ llvm::ErrorOr<const CachedFileSystemEntry *>
+ DependencyScanningWorkerFilesystem::getOrCreateFileSystemEntry(
+-    const StringRef Filename) {
++    const StringRef Filename, bool isForDir) {
+   if (const CachedFileSystemEntry *Entry = getCachedEntry(Filename)) {
+     return Entry;
+   }
+@@ -168,7 +168,7 @@ DependencyScanningWorkerFilesystem::getOrCreateFileSystemEntry(
+     std::unique_lock<std::mutex> LockGuard(SharedCacheEntry.ValueLock);
+     CachedFileSystemEntry &CacheEntry = SharedCacheEntry.Value;
+ 
+-    if (!CacheEntry.isValid()) {
++    if (!CacheEntry.isValid() || isForDir) {
+       llvm::vfs::FileSystem &FS = getUnderlyingFS();
+       auto MaybeStatus = FS.status(Filename);
+       if (!MaybeStatus) {
+@@ -197,11 +197,11 @@ DependencyScanningWorkerFilesystem::getOrCreateFileSystemEntry(
+ }
+ 
+ llvm::ErrorOr<llvm::vfs::Status>
+-DependencyScanningWorkerFilesystem::status(const Twine &Path) {
++DependencyScanningWorkerFilesystem::status(const Twine &Path, bool isForDir) {
+   SmallString<256> OwnedFilename;
+   StringRef Filename = Path.toStringRef(OwnedFilename);
+   const llvm::ErrorOr<const CachedFileSystemEntry *> Result =
+-      getOrCreateFileSystemEntry(Filename);
++      getOrCreateFileSystemEntry(Filename, isForDir);
+   if (!Result)
+     return Result.getError();
+   return (*Result)->getStatus();
+diff --git a/llvm/include/llvm/Support/VirtualFileSystem.h b/llvm/include/llvm/Support/VirtualFileSystem.h
+index 055c0e5dd86..0fe905993ca 100644
+--- a/llvm/include/llvm/Support/VirtualFileSystem.h
++++ b/llvm/include/llvm/Support/VirtualFileSystem.h
+@@ -246,7 +246,7 @@ public:
+   virtual ~FileSystem();
+ 
+   /// Get the status of the entry at \p Path, if one exists.
+-  virtual llvm::ErrorOr<Status> status(const Twine &Path) = 0;
++  virtual llvm::ErrorOr<Status> status(const Twine &Path, bool isForDir = false) = 0;
+ 
+   /// Get a \p File object for the file at \p Path, if one exists.
+   virtual llvm::ErrorOr<std::unique_ptr<File>>
+@@ -331,7 +331,7 @@ public:
+   /// Pushes a file system on top of the stack.
+   void pushOverlay(IntrusiveRefCntPtr<FileSystem> FS);
+ 
+-  llvm::ErrorOr<Status> status(const Twine &Path) override;
++  llvm::ErrorOr<Status> status(const Twine &Path, bool isForDir = false) override;
+   llvm::ErrorOr<std::unique_ptr<File>>
+   openFileForRead(const Twine &Path) override;
+   directory_iterator dir_begin(const Twine &Dir, std::error_code &EC) override;
+@@ -371,7 +371,7 @@ public:
+   explicit ProxyFileSystem(IntrusiveRefCntPtr<FileSystem> FS)
+       : FS(std::move(FS)) {}
+ 
+-  llvm::ErrorOr<Status> status(const Twine &Path) override {
++  llvm::ErrorOr<Status> status(const Twine &Path, bool isForDir = false) override {
+     return FS->status(Path);
+   }
+   llvm::ErrorOr<std::unique_ptr<File>>
+@@ -473,7 +473,7 @@ public:
+   /// Return true if this file system normalizes . and .. in paths.
+   bool useNormalizedPaths() const { return UseNormalizedPaths; }
+ 
+-  llvm::ErrorOr<Status> status(const Twine &Path) override;
++  llvm::ErrorOr<Status> status(const Twine &Path, bool isForDir = false) override;
+   llvm::ErrorOr<std::unique_ptr<File>>
+   openFileForRead(const Twine &Path) override;
+   directory_iterator dir_begin(const Twine &Dir, std::error_code &EC) override;
+@@ -729,7 +729,7 @@ public:
+          SourceMgr::DiagHandlerTy DiagHandler, StringRef YAMLFilePath,
+          void *DiagContext, IntrusiveRefCntPtr<FileSystem> ExternalFS);
+ 
+-  ErrorOr<Status> status(const Twine &Path) override;
++  ErrorOr<Status> status(const Twine &Path, bool isForDir = false) override;
+   ErrorOr<std::unique_ptr<File>> openFileForRead(const Twine &Path) override;
+ 
+   std::error_code getRealPath(const Twine &Path,
+diff --git a/llvm/lib/Support/FileCollector.cpp b/llvm/lib/Support/FileCollector.cpp
+index 4c72f2b0ae9..7884d452b92 100644
+--- a/llvm/lib/Support/FileCollector.cpp
++++ b/llvm/lib/Support/FileCollector.cpp
+@@ -234,7 +234,7 @@ public:
+                                    std::shared_ptr<FileCollector> Collector)
+       : FS(std::move(FS)), Collector(std::move(Collector)) {}
+ 
+-  llvm::ErrorOr<llvm::vfs::Status> status(const Twine &Path) override {
++  llvm::ErrorOr<llvm::vfs::Status> status(const Twine &Path, bool isForDir = false) override {
+     auto Result = FS->status(Path);
+     if (Result && Result->exists())
+       Collector->addFile(Path);
+diff --git a/llvm/lib/Support/VirtualFileSystem.cpp b/llvm/lib/Support/VirtualFileSystem.cpp
+index bbde44c30ca..1ec154d86fd 100644
+--- a/llvm/lib/Support/VirtualFileSystem.cpp
++++ b/llvm/lib/Support/VirtualFileSystem.cpp
+@@ -252,7 +252,7 @@ public:
+     }
+   }
+ 
+-  ErrorOr<Status> status(const Twine &Path) override;
++  ErrorOr<Status> status(const Twine &Path, bool isForDir = false) override;
+   ErrorOr<std::unique_ptr<File>> openFileForRead(const Twine &Path) override;
+   directory_iterator dir_begin(const Twine &Dir, std::error_code &EC) override;
+ 
+@@ -284,7 +284,7 @@ private:
+ 
+ } // namespace
+ 
+-ErrorOr<Status> RealFileSystem::status(const Twine &Path) {
++ErrorOr<Status> RealFileSystem::status(const Twine &Path, bool isForDir) {
+   SmallString<256> Storage;
+   sys::fs::file_status RealStatus;
+   if (std::error_code EC =
+@@ -397,7 +397,7 @@ void OverlayFileSystem::pushOverlay(IntrusiveRefCntPtr<FileSystem> FS) {
+   FS->setCurrentWorkingDirectory(getCurrentWorkingDirectory().get());
+ }
+ 
+-ErrorOr<Status> OverlayFileSystem::status(const Twine &Path) {
++ErrorOr<Status> OverlayFileSystem::status(const Twine &Path, bool isForDir) {
+   // FIXME: handle symlinks that cross file systems
+   for (iterator I = overlays_begin(), E = overlays_end(); I != E; ++I) {
+     ErrorOr<Status> Status = (*I)->status(Path);
+@@ -860,7 +860,7 @@ bool InMemoryFileSystem::addHardLink(const Twine &FromPath,
+                        cast<detail::InMemoryFile>(*ToNode));
+ }
+ 
+-llvm::ErrorOr<Status> InMemoryFileSystem::status(const Twine &Path) {
++llvm::ErrorOr<Status> InMemoryFileSystem::status(const Twine &Path, bool isForDir) {
+   auto Node = lookupInMemoryNode(*this, Root.get(), Path);
+   if (Node)
+     return detail::getNodeStatus(*Node, Path);
+@@ -1774,7 +1774,7 @@ ErrorOr<Status> RedirectingFileSystem::status(const Twine &Path,
+   }
+ }
+ 
+-ErrorOr<Status> RedirectingFileSystem::status(const Twine &Path) {
++ErrorOr<Status> RedirectingFileSystem::status(const Twine &Path, bool isForDir) {
+   ErrorOr<RedirectingFileSystem::Entry *> Result = lookupPath(Path);
+   if (!Result) {
+     if (shouldUseExternalFS() &&
+
