@@ -237,7 +237,7 @@ public:
                                    std::shared_ptr<FileCollector> Collector)
       : FS(std::move(FS)), Collector(std::move(Collector)) {}
 
-  llvm::ErrorOr<llvm::vfs::Status> status(const Twine &Path) override {
+  llvm::ErrorOr<llvm::vfs::Status> status(const Twine &Path, bool isForDir = false) override {
     auto Result = FS->status(Path);
     if (Result && Result->exists())
       Collector->addFile(Path);

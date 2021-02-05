@@ -10,6 +10,9 @@
 #include "clang/Lex/DependencyDirectivesSourceMinimizer.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Threading.h"
+#include <iostream>
+#include <map>
+#include <fstream>
 
 using namespace clang;
 using namespace tooling;
@@ -123,6 +126,68 @@ DependencyScanningFilesystemSharedCache::get(StringRef Key) {
   return It.first->getValue();
 }
 
+std::string jsonEscape(llvm::StringRef Input) {
+  std::string EscapedInput;
+  for (llvm::StringRef::iterator i = Input.begin(), e = Input.end(); i != e; ++i) {
+    if (*i == '\\')
+      EscapedInput += "\\\\";
+    else if (*i == '"')
+      EscapedInput += "\\\"";
+    // bell
+    else if (*i == 0x07)
+      EscapedInput += "\\a";
+    // backspace
+    else if (*i == 0x08)
+      EscapedInput += "\\b";
+    // hoz tab
+    else if (*i == 0x09)
+      EscapedInput += "\\t";
+    // new line
+    else if (*i == 0x0A)
+      EscapedInput += "\\n";
+    // form feed
+    else if (*i == 0x0C)
+      EscapedInput += "\\f";
+    // carr return
+    else if (*i == 0x0D)
+      EscapedInput += "\\r";
+    else if ((unsigned char)*i < 0x20) { // Control characters not handled above.
+      std::string HexStr = llvm::utohexstr(*i);
+      EscapedInput += "\\u" + std::string(4 - HexStr.size(), '0') + HexStr;
+    }
+    else
+      EscapedInput.push_back(*i);
+  }
+  return EscapedInput;
+}
+
+void DependencyScanningFilesystemSharedCache::dumpCache(const std::string& filename) {
+  std::map<std::string, std::string> cacheEntries;
+  std::ofstream scanDepsCache;
+  scanDepsCache.open(filename);
+
+  scanDepsCache << "{";
+  bool firstEntry = true;
+  for (int shardNum = 0; shardNum < NumShards; ++shardNum) {
+    const auto &shard = CacheShards[shardNum];
+    for (auto const& iter : shard.Cache) {
+      const std::string &key = iter.first().str();
+      if (!iter.second.Value.isValid() || iter.second.Value.isDirectory() || iter.second.Value.getContents().getError()) {
+        continue;
+      }
+      const std::string &value = iter.second.Value.getContents()->str();
+
+      if (!firstEntry) {
+        scanDepsCache << ",";
+      }
+      scanDepsCache << "\"" << key << "\": \"" << jsonEscape(value) << "\"";
+      firstEntry = false;
+    }
+  }
+  scanDepsCache << "}";
+  scanDepsCache.close();
+}
+
 /// Whitelist file extensions that should be minimized, treating no extension as
 /// a source file that should be minimized.
 ///
@@ -151,7 +216,7 @@ static bool shouldCacheStatFailures(StringRef Filename) {
 
 llvm::ErrorOr<const CachedFileSystemEntry *>
 DependencyScanningWorkerFilesystem::getOrCreateFileSystemEntry(
-    const StringRef Filename) {
+    const StringRef Filename, bool isForDir) {
   if (const CachedFileSystemEntry *Entry = getCachedEntry(Filename)) {
     return Entry;
   }
@@ -168,7 +233,7 @@ DependencyScanningWorkerFilesystem::getOrCreateFileSystemEntry(
     std::unique_lock<std::mutex> LockGuard(SharedCacheEntry.ValueLock);
     CachedFileSystemEntry &CacheEntry = SharedCacheEntry.Value;
 
-    if (!CacheEntry.isValid()) {
+    if (!CacheEntry.isValid() || isForDir) {
       llvm::vfs::FileSystem &FS = getUnderlyingFS();
       auto MaybeStatus = FS.status(Filename);
       if (!MaybeStatus) {
@@ -197,11 +262,11 @@ DependencyScanningWorkerFilesystem::getOrCreateFileSystemEntry(
 }
 
 llvm::ErrorOr<llvm::vfs::Status>
-DependencyScanningWorkerFilesystem::status(const Twine &Path) {
+DependencyScanningWorkerFilesystem::status(const Twine &Path, bool isForDir) {
   SmallString<256> OwnedFilename;
   StringRef Filename = Path.toStringRef(OwnedFilename);
   const llvm::ErrorOr<const CachedFileSystemEntry *> Result =
-      getOrCreateFileSystemEntry(Filename);
+      getOrCreateFileSystemEntry(Filename, isForDir);
   if (!Result)
     return Result.getError();
   return (*Result)->getStatus();

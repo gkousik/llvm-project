@@ -122,6 +122,8 @@ public:
   /// thread safe call.
   SharedFileSystemEntry &get(StringRef Key);
 
+  void dumpCache(const std::string& filename);
+
 private:
   struct CacheShard {
     std::mutex CacheLock;
@@ -149,7 +151,7 @@ public:
       : ProxyFileSystem(std::move(FS)), SharedCache(SharedCache),
         PPSkipMappings(PPSkipMappings) {}
 
-  llvm::ErrorOr<llvm::vfs::Status> status(const Twine &Path) override;
+  llvm::ErrorOr<llvm::vfs::Status> status(const Twine &Path, bool isForDir = false) override;
   llvm::ErrorOr<std::unique_ptr<llvm::vfs::File>>
   openFileForRead(const Twine &Path) override;
 
@@ -169,7 +171,7 @@ private:
   }
 
   llvm::ErrorOr<const CachedFileSystemEntry *>
-  getOrCreateFileSystemEntry(const StringRef Filename);
+  getOrCreateFileSystemEntry(const StringRef Filename, bool isForDir = false);
 
   DependencyScanningFilesystemSharedCache &SharedCache;
   /// The local cache is used by the worker thread to cache file system queries

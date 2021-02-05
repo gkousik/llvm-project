@@ -17,3 +17,8 @@ DependencyScanningService::DependencyScanningService(
     bool SkipExcludedPPRanges)
     : Mode(Mode), Format(Format), ReuseFileManager(ReuseFileManager),
       SkipExcludedPPRanges(SkipExcludedPPRanges) {}
+
+void DependencyScanningService::dumpCache(const std::string& filename) {
+  auto & cache = getSharedCache();
+  cache.dumpCache(filename);
+}

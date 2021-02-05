@@ -44,7 +44,7 @@ FileSystemStatCache::get(StringRef Path, llvm::vfs::Status &Status,
   else if (isForDir || !F) {
     // If this is a directory or a file descriptor is not needed and we have
     // no cache, just go to the file system.
-    llvm::ErrorOr<llvm::vfs::Status> StatusOrErr = FS.status(Path);
+    llvm::ErrorOr<llvm::vfs::Status> StatusOrErr = FS.status(Path, isForDir);
     if (!StatusOrErr) {
       RetCode = StatusOrErr.getError();
     } else {

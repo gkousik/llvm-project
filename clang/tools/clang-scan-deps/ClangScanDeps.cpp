@@ -540,6 +540,7 @@ int main(int argc, const char **argv) {
   }
   Pool.wait();
 
+  Service.dumpCache("/tmp/clang_scan_deps_cache.cpp");
   if (Format == ScanningOutputFormat::Full)
     FD.printFullOutput(llvm::outs());
 

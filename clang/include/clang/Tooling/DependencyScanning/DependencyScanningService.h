@@ -62,6 +62,8 @@ public:
     return SharedCache;
   }
 
+  void dumpCache(const std::string& filename);
+
 private:
   const ScanningMode Mode;
   const ScanningOutputFormat Format;

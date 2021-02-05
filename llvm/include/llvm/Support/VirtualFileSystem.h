@@ -246,7 +246,7 @@ public:
   virtual ~FileSystem();
 
   /// Get the status of the entry at \p Path, if one exists.
-  virtual llvm::ErrorOr<Status> status(const Twine &Path) = 0;
+  virtual llvm::ErrorOr<Status> status(const Twine &Path, bool isForDir = false) = 0;
 
   /// Get a \p File object for the file at \p Path, if one exists.
   virtual llvm::ErrorOr<std::unique_ptr<File>>
@@ -331,7 +331,7 @@ public:
   /// Pushes a file system on top of the stack.
   void pushOverlay(IntrusiveRefCntPtr<FileSystem> FS);
 
-  llvm::ErrorOr<Status> status(const Twine &Path) override;
+  llvm::ErrorOr<Status> status(const Twine &Path, bool isForDir = false) override;
   llvm::ErrorOr<std::unique_ptr<File>>
   openFileForRead(const Twine &Path) override;
   directory_iterator dir_begin(const Twine &Dir, std::error_code &EC) override;
@@ -371,7 +371,7 @@ public:
   explicit ProxyFileSystem(IntrusiveRefCntPtr<FileSystem> FS)
       : FS(std::move(FS)) {}
 
-  llvm::ErrorOr<Status> status(const Twine &Path) override {
+  llvm::ErrorOr<Status> status(const Twine &Path, bool isForDir = false) override {
     return FS->status(Path);
   }
   llvm::ErrorOr<std::unique_ptr<File>>
@@ -473,7 +473,7 @@ public:
   /// Return true if this file system normalizes . and .. in paths.
   bool useNormalizedPaths() const { return UseNormalizedPaths; }
 
-  llvm::ErrorOr<Status> status(const Twine &Path) override;
+  llvm::ErrorOr<Status> status(const Twine &Path, bool isForDir = false) override;
   llvm::ErrorOr<std::unique_ptr<File>>
   openFileForRead(const Twine &Path) override;
   directory_iterator dir_begin(const Twine &Dir, std::error_code &EC) override;
@@ -729,7 +729,7 @@ public:
          SourceMgr::DiagHandlerTy DiagHandler, StringRef YAMLFilePath,
          void *DiagContext, IntrusiveRefCntPtr<FileSystem> ExternalFS);
 
-  ErrorOr<Status> status(const Twine &Path) override;
+  ErrorOr<Status> status(const Twine &Path, bool isForDir = false) override;
   ErrorOr<std::unique_ptr<File>> openFileForRead(const Twine &Path) override;
 
   std::error_code getRealPath(const Twine &Path,

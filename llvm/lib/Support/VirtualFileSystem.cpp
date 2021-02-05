@@ -252,7 +252,7 @@ public:
     }
   }
 
-  ErrorOr<Status> status(const Twine &Path) override;
+  ErrorOr<Status> status(const Twine &Path, bool isForDir = false) override;
   ErrorOr<std::unique_ptr<File>> openFileForRead(const Twine &Path) override;
   directory_iterator dir_begin(const Twine &Dir, std::error_code &EC) override;
 
@@ -284,7 +284,7 @@ private:
 
 } // namespace
 
-ErrorOr<Status> RealFileSystem::status(const Twine &Path) {
+ErrorOr<Status> RealFileSystem::status(const Twine &Path, bool isForDir) {
   SmallString<256> Storage;
   sys::fs::file_status RealStatus;
   if (std::error_code EC =
@@ -397,7 +397,7 @@ void OverlayFileSystem::pushOverlay(IntrusiveRefCntPtr<FileSystem> FS) {
   FS->setCurrentWorkingDirectory(getCurrentWorkingDirectory().get());
 }
 
-ErrorOr<Status> OverlayFileSystem::status(const Twine &Path) {
+ErrorOr<Status> OverlayFileSystem::status(const Twine &Path, bool isForDir) {
   // FIXME: handle symlinks that cross file systems
   for (iterator I = overlays_begin(), E = overlays_end(); I != E; ++I) {
     ErrorOr<Status> Status = (*I)->status(Path);
@@ -860,7 +860,7 @@ bool InMemoryFileSystem::addHardLink(const Twine &FromPath,
                        cast<detail::InMemoryFile>(*ToNode));
 }
 
-llvm::ErrorOr<Status> InMemoryFileSystem::status(const Twine &Path) {
+llvm::ErrorOr<Status> InMemoryFileSystem::status(const Twine &Path, bool isForDir) {
   auto Node = lookupInMemoryNode(*this, Root.get(), Path);
   if (Node)
     return detail::getNodeStatus(*Node, Path);
@@ -1774,7 +1774,7 @@ ErrorOr<Status> RedirectingFileSystem::status(const Twine &Path,
   }
 }
 
-ErrorOr<Status> RedirectingFileSystem::status(const Twine &Path) {
+ErrorOr<Status> RedirectingFileSystem::status(const Twine &Path, bool isForDir) {
   ErrorOr<RedirectingFileSystem::Entry *> Result = lookupPath(Path);
   if (!Result) {
     if (shouldUseExternalFS() &&
