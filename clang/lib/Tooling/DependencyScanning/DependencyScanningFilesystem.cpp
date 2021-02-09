@@ -109,8 +109,7 @@ DependencyScanningFilesystemSharedCache::
   // sharding gives a performance edge by reducing the lock contention.
   // FIXME: A better heuristic might also consider the OS to account for
   // the different cost of lock contention on different OSes.
-  NumShards =
-      std::max(2u, llvm::hardware_concurrency().compute_thread_count() / 4);
+  NumShards = 1;
   CacheShards = std::make_unique<CacheShard[]>(NumShards);
 }
 
@@ -226,10 +225,13 @@ DependencyScanningWorkerFilesystem::getOrCreateFileSystemEntry(
 
   bool KeepOriginalSource = IgnoredFiles.count(Filename) ||
                             !shouldMinimize(Filename);
+  std::cout << "Getting shard for " << Filename.str() << "\n" << std::flush;
   DependencyScanningFilesystemSharedCache::SharedFileSystemEntry
       &SharedCacheEntry = SharedCache.get(Filename);
+  std::cout << "Got shard for " << Filename.str() << "\n" << std::flush;
   const CachedFileSystemEntry *Result;
   {
+    std::cout << "In critical region for " << Filename.str() << "\n" << std::flush;
     std::unique_lock<std::mutex> LockGuard(SharedCacheEntry.ValueLock);
     CachedFileSystemEntry &CacheEntry = SharedCacheEntry.Value;
 
@@ -248,16 +250,22 @@ DependencyScanningWorkerFilesystem::getOrCreateFileSystemEntry(
       } else if (MaybeStatus->isDirectory())
         CacheEntry = CachedFileSystemEntry::createDirectoryEntry(
             std::move(*MaybeStatus));
-      else
+      else {
+        std::cout << "Creating file entry for " << Filename.str() << "\n" << std::flush;
         CacheEntry = CachedFileSystemEntry::createFileEntry(
             Filename, FS, !KeepOriginalSource);
+        std::cout << "Created file entry for " << Filename.str() << "\n" << std::flush;
+      }
     }
 
+    std::cout << "Finished critical region for " << Filename.str() << "\n" << std::flush;
     Result = &CacheEntry;
   }
 
   // Store the result in the local cache.
+  std::cout << "Setting result entry for " << Filename.str() << "\n" << std::flush;
   setCachedEntry(Filename, Result);
+  std::cout << "Setted result entry for " << Filename.str() << "\n" << std::flush;
   return Result;
 }
 
