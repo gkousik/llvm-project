@@ -52,10 +52,10 @@ public:
       StringRef WorkingDirectory, DependencyConsumer &Consumer,
       llvm::IntrusiveRefCntPtr<DependencyScanningWorkerFilesystem> DepFS,
       ExcludedPreprocessorDirectiveSkipMapping *PPSkipMappings,
-      ScanningOutputFormat Format)
+      ScanningOutputFormat Format, TransitiveIncludesCachePtr TransitiveIncludesCachePtrObj)
       : WorkingDirectory(WorkingDirectory), Consumer(Consumer),
         DepFS(std::move(DepFS)), PPSkipMappings(PPSkipMappings),
-        Format(Format) {}
+        Format(Format), TransitiveIncludesCachePtrObj(TransitiveIncludesCachePtrObj) {}
 
   bool runInvocation(std::shared_ptr<CompilerInvocation> Invocation,
                      FileManager *FileMgr,
@@ -133,6 +133,7 @@ public:
     Compiler.getHeaderSearchOpts().ModulesStrictContextHash = true;
 
     auto Action = std::make_unique<PreprocessOnlyAction>();
+    Action->SetTransitiveIncludesCache(TransitiveIncludesCachePtrObj);
     const bool Result = Compiler.ExecuteAction(*Action);
     if (!DepFS)
       FileMgr->clearStatCache();
@@ -145,6 +146,7 @@ private:
   llvm::IntrusiveRefCntPtr<DependencyScanningWorkerFilesystem> DepFS;
   ExcludedPreprocessorDirectiveSkipMapping *PPSkipMappings;
   ScanningOutputFormat Format;
+  TransitiveIncludesCachePtr TransitiveIncludesCachePtrObj;
 };
 
 } // end anonymous namespace
@@ -163,6 +165,8 @@ DependencyScanningWorker::DependencyScanningWorker(
         Service.getSharedCache(), RealFS, PPSkipMappings.get());
   if (Service.canReuseFileManager())
     Files = new FileManager(FileSystemOptions(), RealFS);
+
+  TransitiveIncludesCachePtrObj = Service.GetTransitiveIncludesCache();
 }
 
 static llvm::Error runWithDiags(
@@ -194,7 +198,7 @@ llvm::Error DependencyScanningWorker::computeDependencies(
     Tool.setPrintErrorMessage(false);
     Tool.setDiagnosticConsumer(&DC);
     DependencyScanningAction Action(WorkingDirectory, Consumer, DepFS,
-                                    PPSkipMappings.get(), Format);
+                                    PPSkipMappings.get(), Format, TransitiveIncludesCachePtrObj);
     return !Tool.run(&Action);
   });
 }

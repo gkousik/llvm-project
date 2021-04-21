@@ -71,7 +71,7 @@ IncrementalParseAST(CompilerInstance& CI, Parser& P,
         llvm::MemoryBuffer::getMemBuffer(code), clang::SrcMgr::C_User);
     SourceLocation MainStartLoc = SM.getLocForStartOfFile(SM.getMainFileID());
     SourceLocation InclLoc = MainStartLoc.getLocWithOffset(counter);
-    S.getPreprocessor().EnterSourceFile(FID, 0, InclLoc);
+    S.getPreprocessor().EnterSourceFile(FID, 0, InclLoc, "");
   }
 
   ExternalASTSource *External = S.getASTContext().getExternalSource();

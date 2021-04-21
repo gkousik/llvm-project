@@ -16,4 +16,4 @@ DependencyScanningService::DependencyScanningService(
     ScanningMode Mode, ScanningOutputFormat Format, bool ReuseFileManager,
     bool SkipExcludedPPRanges)
     : Mode(Mode), Format(Format), ReuseFileManager(ReuseFileManager),
-      SkipExcludedPPRanges(SkipExcludedPPRanges) {}
+      SkipExcludedPPRanges(SkipExcludedPPRanges), TransitiveIncludesCachePtrObj(new TransitiveIncludesCache()) {}

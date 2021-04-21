@@ -1900,6 +1900,16 @@ Preprocessor::ImportAction Preprocessor::HandleHeaderIncludeOrImport(
       Filename = NewName;
   }
 
+  // CurLexer->transitiveIncludes[Filename.str()] = true;
+  // llvm::outs() << "Lexer 1: " << CurLexer.get() << "\n";
+  // llvm::outs() << "Including: " << Filename << " " << "\n";
+  // for (auto &m : CurSubmoduleState->Macros) {
+  //   llvm::outs() << m.first->getName() << " ";
+  //   m.second.getLatest()->dump();
+  //   llvm::outs() << "\n";
+  // }
+  // llvm::outs() << "\n";
+
   // Search include directories.
   bool IsMapped = false;
   bool IsFrameworkFound = false;
@@ -2235,9 +2245,23 @@ Preprocessor::ImportAction Preprocessor::HandleHeaderIncludeOrImport(
     return ImportAction::Failure;
   }
 
+  if (TransitiveIncludes->find(CurLexer->myFilename) != TransitiveIncludes->end()) {
+    if ((*TransitiveIncludes)[CurLexer->myFilename]->IsProcessingComplete) {
+      llvm::outs() << "===========\nTransitive includes before entering source file " << CurLexer->myFilename << "\n";
+      for (auto &it : (*TransitiveIncludes)[CurLexer->myFilename]->IncludeFilenames) {
+        llvm::outs() << it << ",";
+      }
+      llvm::outs() << "\n=========\n\n";
+    }
+  }
+
   // If all is good, enter the new file!
-  if (EnterSourceFile(FID, CurDir, FilenameTok.getLocation()))
+  auto fileinfo = SourceMgr.getFileEntryForID(FID);
+  auto myFilename = fileinfo->tryGetRealPathName().str();
+  // llvm::outs() << "Myfilename: " << myFilename << "\n";
+  if (EnterSourceFile(FID, CurDir, FilenameTok.getLocation(), myFilename)) {
     return {ImportAction::None};
+  }
 
   // Determine if we're switching to building a new submodule, and which one.
   if (auto *M = SuggestedModule.getModule()) {

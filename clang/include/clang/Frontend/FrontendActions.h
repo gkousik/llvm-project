@@ -279,6 +279,12 @@ protected:
 class PreprocessOnlyAction : public PreprocessorFrontendAction {
 protected:
   void ExecuteAction() override;
+public:
+  void SetTransitiveIncludesCache(TransitiveIncludesCachePtr cache) {
+    TransitiveIncludesCachePtrObj = cache;
+  }
+private:
+  TransitiveIncludesCachePtr TransitiveIncludesCachePtrObj;
 };
 
 class PrintPreprocessedAction : public PreprocessorFrontendAction {

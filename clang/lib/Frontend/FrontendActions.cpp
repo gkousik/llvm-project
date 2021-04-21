@@ -781,15 +781,23 @@ void DumpTokensAction::ExecuteAction() {
 void PreprocessOnlyAction::ExecuteAction() {
   Preprocessor &PP = getCompilerInstance().getPreprocessor();
 
+  PP.SetTransitiveIncludesCache(TransitiveIncludesCachePtrObj);
   // Ignore unknown pragmas.
   PP.IgnorePragmas();
 
+  // auto &ci = getCompilerInstance();
+  // std::string inpFilename = ci.getFrontendOpts().Inputs[0].getFile().str();
+  // PP.mainSourceFilename = inpFilename;
+
+  llvm::outs() << "Running preprocess only action\n";
   Token Tok;
   // Start parsing the specified input file.
   PP.EnterMainSourceFile();
   do {
     PP.Lex(Tok);
   } while (Tok.isNot(tok::eof));
+  llvm::outs() << "Main source file name: " << PP.mainSourceFilename << "\n";
+  (*TransitiveIncludesCachePtrObj)[PP.mainSourceFilename]->IsProcessingComplete = true;
 }
 
 void PrintPreprocessedAction::ExecuteAction() {

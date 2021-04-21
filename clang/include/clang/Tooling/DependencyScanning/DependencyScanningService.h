@@ -9,7 +9,9 @@
 #ifndef LLVM_CLANG_TOOLING_DEPENDENCY_SCANNING_SERVICE_H
 #define LLVM_CLANG_TOOLING_DEPENDENCY_SCANNING_SERVICE_H
 
+#include "clang/Lex/Preprocessor.h"
 #include "clang/Tooling/DependencyScanning/DependencyScanningFilesystem.h"
+#include <map>
 
 namespace clang {
 namespace tooling {
@@ -62,6 +64,10 @@ public:
     return SharedCache;
   }
 
+  TransitiveIncludesCachePtr GetTransitiveIncludesCache() {
+    return TransitiveIncludesCachePtrObj;
+  }
+
 private:
   const ScanningMode Mode;
   const ScanningOutputFormat Format;
@@ -72,6 +78,7 @@ private:
   const bool SkipExcludedPPRanges;
   /// The global file system cache.
   DependencyScanningFilesystemSharedCache SharedCache;
+  TransitiveIncludesCachePtr TransitiveIncludesCachePtrObj;
 };
 
 } // end namespace dependencies

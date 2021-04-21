@@ -507,7 +507,7 @@ int main(int argc, const char **argv) {
   }
   for (unsigned I = 0; I < Pool.getThreadCount(); ++I) {
     Pool.async([I, &Lock, &Index, &Inputs, &HadErrors, &FD, &WorkerTools,
-                &DependencyOS, &Errs]() {
+                &DependencyOS, &Errs, &Service]() {
       llvm::StringSet<> AlreadySeenModules;
       while (true) {
         const SingleCommandCompilationDatabase *Input;
@@ -525,19 +525,39 @@ int main(int argc, const char **argv) {
           Filename = std::move(Cmd.Filename);
           CWD = std::move(Cmd.Directory);
         }
-        // Run the tool on it.
-        if (Format == ScanningOutputFormat::Make) {
-          auto MaybeFile = WorkerTools[I]->getDependencyFile(*Input, CWD);
-          if (handleMakeDependencyToolResult(Filename, MaybeFile, DependencyOS,
-                                             Errs))
-            HadErrors = true;
+        auto MaybeFile = WorkerTools[I]->getDependencyFile(*Input, CWD);
+        if (!MaybeFile) {
+          HadErrors = true;
         } else {
-          auto MaybeFullDeps = WorkerTools[I]->getFullDependencies(
-              *Input, CWD, AlreadySeenModules);
-          if (handleFullDependencyToolResult(Filename, MaybeFullDeps, FD,
-                                             LocalIndex, DependencyOS, Errs))
-            HadErrors = true;
+          auto includes = Service.GetTransitiveIncludesCache();
+          std::string res = Filename;
+          llvm::outs() << "Num keys: " << includes->size() << "\n";
+          if (includes->find(Filename) == includes->end()) {
+            res += " had error, result missing from cache\n";
+          } else {
+            res += "\n";
+            if ((*includes)[Filename]->IsProcessingComplete) {
+              for (auto &it : includes->at(Filename)->IncludeFilenames)
+                res += it + "\n";
+            } else {
+              res = " had error, processing not complete\n";
+            }
+          }
+          DependencyOS.applyLocked([&](raw_ostream &OS) { OS << res; });
         }
+        // Run the tool on it.
+        // if (Format == ScanningOutputFormat::Make) {
+        //   auto MaybeFile = WorkerTools[I]->getDependencyFile(*Input, CWD);
+        //   if (handleMakeDependencyToolResult(Filename, MaybeFile, DependencyOS,
+        //                                      Errs))
+        //     HadErrors = true;
+        // } else {
+        //   auto MaybeFullDeps = WorkerTools[I]->getFullDependencies(
+        //       *Input, CWD, AlreadySeenModules);
+        //   if (handleFullDependencyToolResult(Filename, MaybeFullDeps, FD,
+        //                                      LocalIndex, DependencyOS, Errs))
+        //     HadErrors = true;
+        // }
       }
     });
   }

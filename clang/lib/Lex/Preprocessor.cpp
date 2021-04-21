@@ -533,12 +533,14 @@ void Preprocessor::EnterMainSourceFile() {
   // information) and predefined macros aren't guaranteed to be set properly.
   assert(NumEnteredSourceFiles == 0 && "Cannot reenter the main file!");
   FileID MainFileID = SourceMgr.getMainFileID();
+  auto SourceFileInfo = SourceMgr.getFileEntryForID(MainFileID);
+  mainSourceFilename = SourceFileInfo->getName().str();
 
   // If MainFileID is loaded it means we loaded an AST file, no need to enter
   // a main file.
   if (!SourceMgr.isLoadedFileID(MainFileID)) {
     // Enter the main file source buffer.
-    EnterSourceFile(MainFileID, nullptr, SourceLocation());
+    EnterSourceFile(MainFileID, nullptr, SourceLocation(), mainSourceFilename);
 
     // If we've been asked to skip bytes in the main file (e.g., as part of a
     // precompiled preamble), do so now.
@@ -561,7 +563,7 @@ void Preprocessor::EnterMainSourceFile() {
   setPredefinesFileID(FID);
 
   // Start parsing the predefines.
-  EnterSourceFile(FID, nullptr, SourceLocation());
+  EnterSourceFile(FID, nullptr, SourceLocation(), mainSourceFilename);
 
   if (!PPOpts->PCHThroughHeader.empty()) {
     // Lookup and save the FileID for the through header. If it isn't found
@@ -647,6 +649,7 @@ void Preprocessor::SkipTokensWhileUsingPCH() {
     }
     if (Tok.is(tok::eof) && !InPredefines) {
       ReachedMainFileEOF = true;
+      (*TransitiveIncludes)[mainSourceFilename]->IsProcessingComplete = true;
       break;
     }
     if (UsingPCHThroughHeader && !SkippingUntilPCHThroughHeader)

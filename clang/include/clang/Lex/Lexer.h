@@ -24,6 +24,7 @@
 #include <cassert>
 #include <cstdint>
 #include <string>
+#include <map>
 
 namespace llvm {
 
@@ -202,6 +203,8 @@ public:
     // lexer when in raw mode.
     return BufferPtr == BufferEnd;
   }
+
+  std::string myFilename;
 
   /// isKeepWhitespaceMode - Return true if the lexer should return tokens for
   /// every character in the file, including whitespace and comments.  This

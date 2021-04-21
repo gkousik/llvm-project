@@ -65,7 +65,7 @@ PreprocessorLexer *Preprocessor::getCurrentFileLexer() const {
 /// EnterSourceFile - Add a source file to the top of the include stack and
 /// start lexing tokens from it instead of the current buffer.
 bool Preprocessor::EnterSourceFile(FileID FID, const DirectoryLookup *CurDir,
-                                   SourceLocation Loc) {
+                                   SourceLocation Loc, const std::string& filename) {
   assert(!CurTokenLexer && "Cannot #include a file inside a macro!");
   ++NumEnteredSourceFiles;
 
@@ -89,7 +89,9 @@ bool Preprocessor::EnterSourceFile(FileID FID, const DirectoryLookup *CurDir,
         CodeCompletionFileLoc.getLocWithOffset(CodeCompletionOffset);
   }
 
-  EnterSourceFileWithLexer(new Lexer(FID, *InputFile, *this), CurDir);
+  Lexer *TheLexer = new Lexer(FID, *InputFile, *this);
+  TheLexer->myFilename = filename;
+  EnterSourceFileWithLexer(TheLexer, CurDir);
   return false;
 }
 
@@ -306,6 +308,14 @@ bool Preprocessor::HandleEndOfFile(Token &Result, bool isEndOfMacro) {
   assert(!CurTokenLexer &&
          "Ending a file when currently in a macro!");
 
+  if (CurLexer && TransitiveIncludes) {
+    if (TransitiveIncludes->find(CurLexer->myFilename) == TransitiveIncludes->end()) {
+      (*TransitiveIncludes)[CurLexer->myFilename].reset(new TransitiveIncludesInfo());
+    }
+    if (IncludeMacroStack.empty())
+      (*TransitiveIncludes)[CurLexer->myFilename]->IsProcessingComplete = true;
+  }
+
   // If we have an unclosed module region from a pragma at the end of a
   // module, complain and close it now.
   const bool LeavingSubmodule = CurLexer && CurLexerSubmodule;
@@ -457,6 +467,9 @@ bool Preprocessor::HandleEndOfFile(Token &Result, bool isEndOfMacro) {
             SourceMgr.getFileEntryForID(CurPPLexer->getFileID())))
       FoundPCHThroughHeader = true;
 
+    if (CurLexer) {
+      llvm::outs() << "Done with file: " << CurLexer->myFilename << " " << Result.getLiteralData() << "\n";
+    }
     // We're done with the #included file.
     RemoveTopOfLexerStack();
 

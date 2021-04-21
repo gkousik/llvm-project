@@ -54,6 +54,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <set>
 
 namespace llvm {
 
@@ -84,6 +85,14 @@ class TargetInfo;
 namespace Builtin {
 class Context;
 }
+
+struct TransitiveIncludesInfo {
+  std::set<std::string> IncludeFilenames;
+  bool IsProcessingComplete;
+};
+
+typedef std::map<std::string, std::unique_ptr<TransitiveIncludesInfo> > TransitiveIncludesCache;
+typedef std::shared_ptr<std::map<std::string, std::unique_ptr<TransitiveIncludesInfo> > > TransitiveIncludesCachePtr;
 
 /// Stores token information for comparing actual tokens with
 /// predefined values.  Only handles simple tokens and identifiers.
@@ -432,6 +441,12 @@ class Preprocessor {
   SourceLocation MaxTokensOverrideLoc;
 
 public:
+  void SetTransitiveIncludesCache(TransitiveIncludesCachePtr cache) {
+    TransitiveIncludes = cache;
+  }
+
+  TransitiveIncludesCachePtr TransitiveIncludes;
+
   struct PreambleSkipInfo {
     SourceLocation HashTokenLoc;
     SourceLocation IfTokenLoc;
@@ -1325,7 +1340,7 @@ public:
   ///
   /// Emits a diagnostic, doesn't enter the file, and returns true on error.
   bool EnterSourceFile(FileID FID, const DirectoryLookup *Dir,
-                       SourceLocation Loc);
+                       SourceLocation Loc, const std::string& filename);
 
   /// Add a Macro to the top of the include stack and start lexing
   /// tokens from it instead of the current buffer.
@@ -1930,6 +1945,8 @@ private:
   void diagnoseMissingHeaderInUmbrellaDir(const Module &Mod);
 
 public:
+  std::string mainSourceFilename;
+
   void PoisonSEHIdentifiers(bool Poison = true); // Borland
 
   /// Callback invoked when the lexer reads an identifier and has
@@ -2035,7 +2052,7 @@ public:
 private:
   friend void TokenLexer::ExpandFunctionArguments();
 
-  void PushIncludeMacroStack() {
+  void PushIncludeMacroStack() {  
     assert(CurLexerKind != CLK_CachingLexer && "cannot push a caching lexer");
     IncludeMacroStack.emplace_back(CurLexerKind, CurLexerSubmodule,
                                    std::move(CurLexer), CurPPLexer,
@@ -2044,6 +2061,25 @@ private:
   }
 
   void PopIncludeMacroStack() {
+    if (CurLexer) {
+      auto &prevLexer = IncludeMacroStack.back().TheLexer;
+      // llvm::outs() << "PrevLexer filename: " << prevLexer->myFilename << "-\n";
+      // llvm::outs() << "Curlexer filename: " << CurLexer->myFilename << "-\n";
+
+      if (TransitiveIncludes->find(prevLexer->myFilename) == TransitiveIncludes->end()) {
+        (*TransitiveIncludes)[prevLexer->myFilename].reset(new TransitiveIncludesInfo());
+      }
+
+      // All the deps of the current lexer should be added as transitive includes of the previous
+      // lexer.
+      if (TransitiveIncludes->find(CurLexer->myFilename) != TransitiveIncludes->end()) {
+        for (auto &it : (*TransitiveIncludes)[CurLexer->myFilename]->IncludeFilenames) {
+          (*TransitiveIncludes)[prevLexer->myFilename]->IncludeFilenames.insert(it);
+        }
+      }
+      // Current lexer is also a transitive include of the previous lexer.
+      (*TransitiveIncludes)[prevLexer->myFilename]->IncludeFilenames.insert(CurLexer->myFilename);
+    }
     CurLexer = std::move(IncludeMacroStack.back().TheLexer);
     CurPPLexer = IncludeMacroStack.back().ThePPLexer;
     CurTokenLexer = std::move(IncludeMacroStack.back().TheTokenLexer);

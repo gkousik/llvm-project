@@ -77,6 +77,8 @@ private:
   /// worker. If null, the file manager will not be reused.
   llvm::IntrusiveRefCntPtr<FileManager> Files;
   ScanningOutputFormat Format;
+
+  TransitiveIncludesCachePtr TransitiveIncludesCachePtrObj;
 };
 
 } // end namespace dependencies
