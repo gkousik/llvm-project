@@ -56,6 +56,7 @@
 #include <utility>
 #include <vector>
 #include <set>
+#include <mutex>
 
 namespace llvm {
 
@@ -92,8 +93,19 @@ struct TransitiveIncludesInfo {
   bool IsProcessingComplete;
 };
 
-typedef std::map<std::string, std::unique_ptr<TransitiveIncludesInfo> > TransitiveIncludesCache;
-typedef std::shared_ptr<std::map<std::string, std::unique_ptr<TransitiveIncludesInfo> > > TransitiveIncludesCachePtr;
+typedef struct TransitiveIncludesCache {
+  std::map<std::string, std::unique_ptr<TransitiveIncludesInfo> > cache;
+
+  std::mutex cache_mutex;
+  void Lock() {
+    cache_mutex.lock();
+  }
+  void Unlock() {
+    cache_mutex.unlock();
+  }
+};
+
+typedef std::shared_ptr<TransitiveIncludesCache> TransitiveIncludesCachePtr;
 
 /// Stores token information for comparing actual tokens with
 /// predefined values.  Only handles simple tokens and identifiers.
@@ -2090,20 +2102,22 @@ private:
       // llvm::outs() << "PrevLexer filename: " << prevLexer->myFilename << "-\n";
       // llvm::outs() << "Curlexer filename: " << CurLexer->myFilename << "-\n";
 
-      if (TransitiveIncludes->find(prevLexer->myFilename) == TransitiveIncludes->end()) {
-        (*TransitiveIncludes)[prevLexer->myFilename].reset(new TransitiveIncludesInfo());
+      TransitiveIncludes->Lock();
+      if (TransitiveIncludes->cache.find(prevLexer->myFilename) == TransitiveIncludes->cache.end()) {
+        (*TransitiveIncludes).cache[prevLexer->myFilename].reset(new TransitiveIncludesInfo());
       }
-      if (TransitiveIncludes->find(CurLexer->myFilename) == TransitiveIncludes->end()) {
-        (*TransitiveIncludes)[CurLexer->myFilename].reset(new TransitiveIncludesInfo());
+      if (TransitiveIncludes->cache.find(CurLexer->myFilename) == TransitiveIncludes->cache.end()) {
+        (*TransitiveIncludes).cache[CurLexer->myFilename].reset(new TransitiveIncludesInfo());
       }
 
       // All the deps of the current lexer should be added as transitive includes of the previous
       // lexer.
-      for (auto &it : (*TransitiveIncludes)[CurLexer->myFilename]->IncludeFilenames) {
-        (*TransitiveIncludes)[prevLexer->myFilename]->IncludeFilenames.insert(it);
+      for (auto &it : (*TransitiveIncludes).cache[CurLexer->myFilename]->IncludeFilenames) {
+        (*TransitiveIncludes).cache[prevLexer->myFilename]->IncludeFilenames.insert(it);
       }
       // Current lexer is also a transitive include of the previous lexer.
-      (*TransitiveIncludes)[prevLexer->myFilename]->IncludeFilenames.insert(CurLexer->myFilename);
+      (*TransitiveIncludes).cache[prevLexer->myFilename]->IncludeFilenames.insert(CurLexer->myFilename);
+      TransitiveIncludes->Unlock();
     }
     CurLexer = std::move(IncludeMacroStack.back().TheLexer);
     CurPPLexer = IncludeMacroStack.back().ThePPLexer;

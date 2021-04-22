@@ -780,8 +780,8 @@ void DumpTokensAction::ExecuteAction() {
 }
 
 void PreprocessOnlyAction::ExecuteAction() {
-  llvm::outs() << "Comes here 5.1\n";
-  llvm::outs().flush();
+  // llvm::outs() << "Comes here 5.1\n";
+  // llvm::outs().flush();
 
   Preprocessor &PP = getCompilerInstance().getPreprocessor();
 
@@ -793,23 +793,23 @@ void PreprocessOnlyAction::ExecuteAction() {
   // std::string inpFilename = ci.getFrontendOpts().Inputs[0].getFile().str();
   // PP.mainSourceFilename = inpFilename;
 
-  llvm::outs() << "Running preprocess only action\n";
-  llvm::outs().flush();
-  // llvm::sys::PrintStackTrace(llvm::outs());
+  // llvm::outs() << "Running preprocess only action\n";
   // llvm::outs().flush();
   Token Tok;
-  llvm::outs() << "Comes here 5.2\n";
-  llvm::outs().flush();
+  // llvm::outs() << "Comes here 5.2\n";
+  // llvm::outs().flush();
   // Start parsing the specified input file.
   PP.EnterMainSourceFile();
-  llvm::outs() << "Comes here 5.3\n";
-  llvm::outs().flush();
+  // llvm::outs() << "Comes here 5.3\n";
+  // llvm::outs().flush();
   do {
     PP.Lex(Tok);
   } while (Tok.isNot(tok::eof));
-  llvm::outs() << "Comes here 5.4\n";
-  llvm::outs().flush();
-  (*TransitiveIncludesCachePtrObj)[PP.mainSourceFilename]->IsProcessingComplete = true;
+  // llvm::outs() << "Comes here 5.4\n";
+  // llvm::outs().flush();
+  TransitiveIncludesCachePtrObj->Lock();
+  (*TransitiveIncludesCachePtrObj).cache[PP.mainSourceFilename]->IsProcessingComplete = true;
+  TransitiveIncludesCachePtrObj->Unlock();
 }
 
 void PrintPreprocessedAction::ExecuteAction() {

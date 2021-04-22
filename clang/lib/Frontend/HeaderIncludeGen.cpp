@@ -152,12 +152,14 @@ void HeaderIncludesCallback::FileChanged(SourceLocation Loc,
     llvm::sys::path::remove_dots(Pathname, true);
     const std::string& PathnameStr = Pathname.str().str();
   
-    llvm::outs() << "Exiting file: " << PathnameStr << " " << CurrentIncludeDepth << "\n";
-    llvm::outs().flush();
+    // llvm::outs() << "Exiting file: " << PathnameStr << " " << CurrentIncludeDepth << "\n";
+    // llvm::outs().flush();
     if (UserLoc.getFilename() != StringRef("<command line>") && CurrentIncludeDepth > 0) {
-      if (PP->TransitiveIncludes->find(PathnameStr) == PP->TransitiveIncludes->end())
-        (*(PP->TransitiveIncludes))[PathnameStr].reset(new TransitiveIncludesInfo());
-      (*(PP->TransitiveIncludes))[PathnameStr]->IsProcessingComplete = true;
+      PP->TransitiveIncludes->Lock();
+      if (PP->TransitiveIncludes->cache.find(PathnameStr) == PP->TransitiveIncludes->cache.end())
+        (*(PP->TransitiveIncludes)).cache[PathnameStr].reset(new TransitiveIncludesInfo());
+      (*(PP->TransitiveIncludes)).cache[PathnameStr]->IsProcessingComplete = true;
+      PP->TransitiveIncludes->Unlock();
       // llvm::outs() << "Done with file: " << PathnameStr << " " << CurrentIncludeDepth << "\n";
       // llvm::outs().flush();
     }

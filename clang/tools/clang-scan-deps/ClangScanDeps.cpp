@@ -538,13 +538,12 @@ int main(int argc, const char **argv) {
         } else {
           auto includes = Service.GetTransitiveIncludesCache();
           std::string res = Filename;
-          llvm::outs() << "Num keys: " << includes->size() << "\n";
-          if (includes->find(Filename) == includes->end()) {
+          if (includes->cache.find(Filename) == includes->cache.end()) {
             res += " had error, result missing from cache\n";
           } else {
             res += "\n";
-            if ((*includes)[Filename]->IsProcessingComplete) {
-              for (auto &it : includes->at(Filename)->IncludeFilenames)
+            if ((*includes).cache[Filename]->IsProcessingComplete) {
+              for (auto &it : includes->cache.at(Filename)->IncludeFilenames)
                 res += it + "\n";
             } else {
               res = " had error, processing not complete\n";
