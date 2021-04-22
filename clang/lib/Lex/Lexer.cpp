@@ -38,6 +38,7 @@
 #include "llvm/Support/MemoryBufferRef.h"
 #include "llvm/Support/NativeFormatting.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/Signals.h"
 #include "llvm/Support/UnicodeCharRanges.h"
 #include <algorithm>
 #include <cassert>

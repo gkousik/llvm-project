@@ -912,6 +912,8 @@ bool CompilerInstance::InitializeSourceManager(const FrontendInputFile &Input,
 // High-Level Operations
 
 bool CompilerInstance::ExecuteAction(FrontendAction &Act) {
+  llvm::outs() << "Comes here 1\n";
+  llvm::outs().flush();
   assert(hasDiagnostics() && "Diagnostics engine is not initialized!");
   assert(!getFrontendOpts().ShowHelp && "Client must handle '-help'!");
   assert(!getFrontendOpts().ShowVersion && "Client must handle '-version'!");
@@ -933,6 +935,9 @@ bool CompilerInstance::ExecuteAction(FrontendAction &Act) {
   if (getFrontendOpts().ProgramAction == frontend::RewriteObjC)
     getTarget().noSignedCharForObjCBool();
 
+  llvm::outs() << "Comes here 2\n";
+  llvm::outs().flush();
+
   // Validate/process some options.
   if (getHeaderSearchOpts().Verbose)
     OS << "clang -cc1 version " CLANG_VERSION_STRING
@@ -951,10 +956,19 @@ bool CompilerInstance::ExecuteAction(FrontendAction &Act) {
     if (hasSourceManager() && !Act.isModelParsingAction())
       getSourceManager().clearIDTables();
 
+    llvm::outs() << "Comes here 3\n";
+    llvm::outs().flush();
+
     if (Act.BeginSourceFile(*this, FIF)) {
+      llvm::outs() << "Comes here 4\n";
+      llvm::outs().flush();
+
       if (llvm::Error Err = Act.Execute()) {
         consumeError(std::move(Err)); // FIXME this drops errors on the floor.
       }
+      llvm::outs() << "Comes here 20\n";
+      llvm::outs().flush();
+
       Act.EndSourceFile();
     }
   }

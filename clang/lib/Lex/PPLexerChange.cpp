@@ -22,6 +22,7 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBufferRef.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/Signals.h"
 using namespace clang;
 
 //===----------------------------------------------------------------------===//
@@ -308,14 +309,6 @@ bool Preprocessor::HandleEndOfFile(Token &Result, bool isEndOfMacro) {
   assert(!CurTokenLexer &&
          "Ending a file when currently in a macro!");
 
-  if (CurLexer && TransitiveIncludes) {
-    if (TransitiveIncludes->find(CurLexer->myFilename) == TransitiveIncludes->end()) {
-      (*TransitiveIncludes)[CurLexer->myFilename].reset(new TransitiveIncludesInfo());
-    }
-    if (IncludeMacroStack.empty())
-      (*TransitiveIncludes)[CurLexer->myFilename]->IsProcessingComplete = true;
-  }
-
   // If we have an unclosed module region from a pragma at the end of a
   // module, complain and close it now.
   const bool LeavingSubmodule = CurLexer && CurLexerSubmodule;
@@ -467,8 +460,9 @@ bool Preprocessor::HandleEndOfFile(Token &Result, bool isEndOfMacro) {
             SourceMgr.getFileEntryForID(CurPPLexer->getFileID())))
       FoundPCHThroughHeader = true;
 
-    if (CurLexer) {
-      llvm::outs() << "Done with file: " << CurLexer->myFilename << " " << Result.getLiteralData() << "\n";
+    if (CurLexer && CurLexer->myFilename.find_first_not_of("v8_xr_system.cc") != std::string::npos) {
+      // llvm::sys::PrintStackTrace(llvm::outs());
+      // llvm::outs() << "Done with file: " << CurLexer->myFilename << " " << Result.getLiteralData() << "\n";
     }
     // We're done with the #included file.
     RemoveTopOfLexerStack();

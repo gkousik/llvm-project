@@ -25,6 +25,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include <cassert>
 #include <utility>
+#include <sstream>
 
 using namespace clang;
 
@@ -175,6 +176,53 @@ LLVM_DUMP_METHOD void MacroInfo::dump() const {
   }
 }
 
+std::string MacroInfo::toStr() const {
+  std::stringstream Out;
+
+  // FIXME: Dump locations.
+  if (IsBuiltinMacro) Out << " builtin";
+  if (IsDisabled) Out << " disabled";
+  if (IsUsed) Out << " used";
+  if (IsAllowRedefinitionsWithoutWarning)
+    Out << " allow_redefinitions_without_warning";
+  if (IsWarnIfUnused) Out << " warn_if_unused";
+  if (UsedForHeaderGuard) Out << " header_guard";
+
+  Out << "\n    #define <macro>";
+  if (IsFunctionLike) {
+    Out << "(";
+    for (unsigned I = 0; I != NumParameters; ++I) {
+      if (I) Out << ", ";
+      Out << ParameterList[I]->getName().str();
+    }
+    if (IsC99Varargs || IsGNUVarargs) {
+      if (NumParameters && IsC99Varargs) Out << ", ";
+      Out << "...";
+    }
+    Out << ")";
+  }
+
+  bool First = true;
+  for (const Token &Tok : ReplacementTokens) {
+    // Leading space is semantically meaningful in a macro definition,
+    // so preserve it in the dump output.
+    if (First || Tok.hasLeadingSpace())
+      Out << " ";
+    First = false;
+
+    if (const char *Punc = tok::getPunctuatorSpelling(Tok.getKind()))
+      Out << Punc;
+    else if (Tok.isLiteral() && Tok.getLiteralData())
+      Out << StringRef(Tok.getLiteralData(), Tok.getLength()).str();
+    else if (auto *II = Tok.getIdentifierInfo())
+      Out << II->getName().str();
+    else
+      Out << Tok.getName();
+  }
+
+  return Out.str();
+}
+
 MacroDirective::DefInfo MacroDirective::getDefinition() {
   MacroDirective *MD = this;
   SourceLocation UndefLoc;
@@ -236,6 +284,31 @@ LLVM_DUMP_METHOD void MacroDirective::dump() const {
     }
   }
   Out << "\n";
+}
+
+std::string MacroDirective::toStr() const {
+  std::stringstream Out;
+
+  switch (getKind()) {
+  case MD_Define: Out << "DefMacroDirective"; break;
+  case MD_Undefine: Out << "UndefMacroDirective"; break;
+  case MD_Visibility: Out << "VisibilityMacroDirective"; break;
+  }
+  // // FIXME: Dump SourceLocation.
+  // if (auto *Prev = getPrevious())
+  //   Out << " prev " << Prev;
+  // if (IsFromPCH) Out << " from_pch";
+
+  // if (isa<VisibilityMacroDirective>(this))
+  //   Out << (IsPublic ? " public" : " private");
+
+  // if (auto *DMD = dyn_cast<DefMacroDirective>(this)) {
+  //   if (auto *Info = DMD->getInfo()) {
+  //     Out << "\n  ";
+  //     Out << Info->toStr();
+  //   }
+  // }
+  return Out.str();
 }
 
 ModuleMacro *ModuleMacro::create(Preprocessor &PP, Module *OwningModule,

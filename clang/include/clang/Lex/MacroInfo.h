@@ -274,6 +274,8 @@ public:
 
   void dump() const;
 
+  std::string toStr() const;
+
 private:
   friend class Preprocessor;
 
@@ -398,6 +400,8 @@ public:
                                    const SourceManager &SM) const;
 
   void dump() const;
+
+  std::string toStr() const;
 
   static bool classof(const MacroDirective *) { return true; }
 };

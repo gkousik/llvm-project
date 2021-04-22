@@ -1900,9 +1900,6 @@ Preprocessor::ImportAction Preprocessor::HandleHeaderIncludeOrImport(
       Filename = NewName;
   }
 
-  // CurLexer->transitiveIncludes[Filename.str()] = true;
-  // llvm::outs() << "Lexer 1: " << CurLexer.get() << "\n";
-  // llvm::outs() << "Including: " << Filename << " " << "\n";
   // for (auto &m : CurSubmoduleState->Macros) {
   //   llvm::outs() << m.first->getName() << " ";
   //   m.second.getLatest()->dump();
@@ -2245,21 +2242,37 @@ Preprocessor::ImportAction Preprocessor::HandleHeaderIncludeOrImport(
     return ImportAction::Failure;
   }
 
-  if (TransitiveIncludes->find(CurLexer->myFilename) != TransitiveIncludes->end()) {
-    if ((*TransitiveIncludes)[CurLexer->myFilename]->IsProcessingComplete) {
-      llvm::outs() << "===========\nTransitive includes before entering source file " << CurLexer->myFilename << "\n";
-      for (auto &it : (*TransitiveIncludes)[CurLexer->myFilename]->IncludeFilenames) {
-        llvm::outs() << it << ",";
+  // If all is good, enter the new file!
+  auto fileinfo = SourceMgr.getFileEntryForID(FID);
+  auto toEnterFilename = fileinfo->tryGetRealPathName().str();
+
+  llvm::outs() << "Cur file: " << CurLexer->myFilename << "\n";
+  llvm::outs().flush();
+
+  if (TransitiveIncludes->find(toEnterFilename) != TransitiveIncludes->end()) {
+    if ((*TransitiveIncludes)[toEnterFilename]->IsProcessingComplete) {
+      if (TransitiveIncludes->find(CurLexer->myFilename) == TransitiveIncludes->end()) {
+        (*TransitiveIncludes)[CurLexer->myFilename].reset(new TransitiveIncludesInfo());
       }
-      llvm::outs() << "\n=========\n\n";
+      for (auto &it : (*TransitiveIncludes)[CurLexer->myFilename]->IncludeFilenames) {
+        (*TransitiveIncludes)[toEnterFilename]->IncludeFilenames.insert(it);
+      }
+      llvm::outs() << "Skipping entering file: " << toEnterFilename << "\n";
+      llvm::outs().flush();
+
+      return {ImportAction::None};
+      // llvm::outs() << "===========\nTransitive includes before entering source file " << toEnterFilename << "\n";
+      // for (auto &it : (*TransitiveIncludes)[toEnterFilename]->IncludeFilenames)
+      //   llvm::outs() << it << ",";
+      // llvm::outs() << "\n=========\n\n";
+      // llvm::outs().flush();
     }
   }
 
-  // If all is good, enter the new file!
-  auto fileinfo = SourceMgr.getFileEntryForID(FID);
-  auto myFilename = fileinfo->tryGetRealPathName().str();
-  // llvm::outs() << "Myfilename: " << myFilename << "\n";
-  if (EnterSourceFile(FID, CurDir, FilenameTok.getLocation(), myFilename)) {
+  llvm::outs() << "Entering file: " << toEnterFilename << "\n";
+  llvm::outs().flush();
+
+  if (EnterSourceFile(FID, CurDir, FilenameTok.getLocation(), toEnterFilename)) {
     return {ImportAction::None};
   }
 

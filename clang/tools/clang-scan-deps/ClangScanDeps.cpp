@@ -528,6 +528,13 @@ int main(int argc, const char **argv) {
         auto MaybeFile = WorkerTools[I]->getDependencyFile(*Input, CWD);
         if (!MaybeFile) {
           HadErrors = true;
+          llvm::handleAllErrors(
+            MaybeFile.takeError(), [&Input, &Errs](llvm::StringError &Err) {
+              Errs.applyLocked([&](raw_ostream &OS) {
+                OS << "Error while scanning dependencies for " << Input << ":\n";
+                OS << Err.getMessage();
+              });
+            });
         } else {
           auto includes = Service.GetTransitiveIncludesCache();
           std::string res = Filename;

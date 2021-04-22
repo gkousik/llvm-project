@@ -26,6 +26,7 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/Signals.h"
 #include "llvm/Support/YAMLTraits.h"
 #include "llvm/Support/raw_ostream.h"
 #include <memory>
@@ -779,6 +780,9 @@ void DumpTokensAction::ExecuteAction() {
 }
 
 void PreprocessOnlyAction::ExecuteAction() {
+  llvm::outs() << "Comes here 5.1\n";
+  llvm::outs().flush();
+
   Preprocessor &PP = getCompilerInstance().getPreprocessor();
 
   PP.SetTransitiveIncludesCache(TransitiveIncludesCachePtrObj);
@@ -790,13 +794,21 @@ void PreprocessOnlyAction::ExecuteAction() {
   // PP.mainSourceFilename = inpFilename;
 
   llvm::outs() << "Running preprocess only action\n";
+  llvm::outs().flush();
+  // llvm::sys::PrintStackTrace(llvm::outs());
+  // llvm::outs().flush();
   Token Tok;
+  llvm::outs() << "Comes here 5.2\n";
+  llvm::outs().flush();
   // Start parsing the specified input file.
   PP.EnterMainSourceFile();
+  llvm::outs() << "Comes here 5.3\n";
+  llvm::outs().flush();
   do {
     PP.Lex(Tok);
   } while (Tok.isNot(tok::eof));
-  llvm::outs() << "Main source file name: " << PP.mainSourceFilename << "\n";
+  llvm::outs() << "Comes here 5.4\n";
+  llvm::outs().flush();
   (*TransitiveIncludesCachePtrObj)[PP.mainSourceFilename]->IsProcessingComplete = true;
 }
 

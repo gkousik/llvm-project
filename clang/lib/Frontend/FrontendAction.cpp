@@ -553,15 +553,24 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
   setCurrentInput(Input);
   setCompilerInstance(&CI);
 
+  llvm::outs() << "Comes here 3.1\n";
+  llvm::outs().flush();
+
   bool HasBegunSourceFile = false;
   bool ReplayASTFile = Input.getKind().getFormat() == InputKind::Precompiled &&
                        usesPreprocessorOnly();
   if (!BeginInvocation(CI))
     goto failure;
 
+  llvm::outs() << "Comes here 3.2\n";
+  llvm::outs().flush();
+
   // If we're replaying the build of an AST file, import it and set up
   // the initial state from its build.
   if (ReplayASTFile) {
+  llvm::outs() << "Comes here 3.3\n";
+  llvm::outs().flush();
+
     IntrusiveRefCntPtr<DiagnosticsEngine> Diags(&CI.getDiagnostics());
 
     // The AST unit populates its own diagnostics engine rather than ours.
@@ -629,9 +638,14 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
     setCurrentInput(Input, std::move(AST));
   }
 
+  llvm::outs() << "Comes here 3.4\n";
+  llvm::outs().flush();
   // AST files follow a very different path, since they share objects via the
   // AST unit.
   if (Input.getKind().getFormat() == InputKind::Precompiled) {
+    llvm::outs() << "Comes here 3.5\n";
+    llvm::outs().flush();
+
     assert(!usesPreprocessorOnly() && "this case was handled above");
     assert(hasASTFileSupport() &&
            "This action does not have AST file support!");
@@ -646,8 +660,14 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
         ASTUnit::LoadEverything, Diags, CI.getFileSystemOpts(),
         CI.getCodeGenOpts().DebugTypeExtRefs);
 
+    llvm::outs() << "Comes here 3.6\n";
+    llvm::outs().flush();
+
     if (!AST)
       goto failure;
+
+    llvm::outs() << "Comes here 3.7\n";
+    llvm::outs().flush();
 
     // Inform the diagnostic client we are processing a source file.
     CI.getDiagnosticClient().BeginSourceFile(CI.getLangOpts(), nullptr);
@@ -663,7 +683,13 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
                                            PP.getLangOpts());
     CI.setASTContext(&AST->getASTContext());
 
+    llvm::outs() << "Comes here 3.8\n";
+    llvm::outs().flush();
+
     setCurrentInput(Input, std::move(AST));
+
+    llvm::outs() << "Comes here 3.9\n";
+    llvm::outs().flush();
 
     // Initialize the action.
     if (!BeginSourceFileAction(CI))
@@ -801,9 +827,15 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
     }
   }
 
+  llvm::outs() << "Comes here 3.10\n";
+  llvm::outs().flush();
+
   // Initialize the action.
   if (!BeginSourceFileAction(CI))
     goto failure;
+
+  llvm::outs() << "Comes here 3.11\n";
+  llvm::outs().flush();
 
   // If we were asked to load any module map files, do so now.
   for (const auto &Filename : CI.getFrontendOpts().ModuleMapFiles) {
@@ -925,11 +957,17 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
     CI.getASTContext().setExternalSource(Override);
   }
 
+  llvm::outs() << "Comes here 3.20 (success)\n";
+  llvm::outs().flush();
+
   return true;
 
   // If we failed, reset state since the client will not end up calling the
   // matching EndSourceFile().
 failure:
+  llvm::outs() << "Comes here 3.12 (failure)\n";
+  llvm::outs().flush();
+
   if (HasBegunSourceFile)
     CI.getDiagnosticClient().EndSourceFile();
   CI.clearOutputFiles(/*EraseFiles=*/true);
@@ -942,11 +980,17 @@ failure:
 llvm::Error FrontendAction::Execute() {
   CompilerInstance &CI = getCompilerInstance();
 
+  llvm::outs() << "Comes here 5\n";
+  llvm::outs().flush();
+
   if (CI.hasFrontendTimer()) {
     llvm::TimeRegion Timer(CI.getFrontendTimer());
     ExecuteAction();
   }
   else ExecuteAction();
+
+  llvm::outs() << "Comes here 6\n";
+  llvm::outs().flush();
 
   // If we are supposed to rebuild the global module index, do so now unless
   // there were any module-build failures.

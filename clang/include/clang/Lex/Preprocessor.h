@@ -46,6 +46,7 @@
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Registry.h"
+#include "llvm/Support/MD5.h"
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
@@ -776,6 +777,29 @@ private:
   /// The current submodule state. Will be \p NullSubmoduleState if we're not
   /// in a submodule.
   SubmoduleState *CurSubmoduleState;
+
+  std::string GetCurrentMacroStateHash() {
+    std::string allMacros = "";
+    std::vector<std::string> macroNames;
+    for (auto &m : CurSubmoduleState->Macros)
+      macroNames.push_back(m.first->getName().str());
+    std::sort(macroNames.begin(), macroNames.end());
+    for (auto &n : macroNames) {
+      allMacros += n + ",";
+      // allMacros += m.second.getLatest()->toStr();
+    }
+    llvm::MD5 Hash;
+    llvm::MD5::MD5Result Result;
+
+    Hash.update(allMacros);
+    Hash.final(Result);
+
+    // if (CurLexer->myFilename == "/usr/local/google/home/kousikk/disk-2/chromium/src/out/rbe/gen/third_party/blink/renderer/bindings/modules/v8/v8_xr_system.cc")
+    //   llvm::outs() << allMacros << "\n";
+    llvm::SmallString<32> res;
+    Hash.stringifyResult(Result, res);
+    return res.str().str();
+  }
 
   /// The set of known macros exported from modules.
   llvm::FoldingSet<ModuleMacro> ModuleMacros;
@@ -2069,13 +2093,14 @@ private:
       if (TransitiveIncludes->find(prevLexer->myFilename) == TransitiveIncludes->end()) {
         (*TransitiveIncludes)[prevLexer->myFilename].reset(new TransitiveIncludesInfo());
       }
+      if (TransitiveIncludes->find(CurLexer->myFilename) == TransitiveIncludes->end()) {
+        (*TransitiveIncludes)[CurLexer->myFilename].reset(new TransitiveIncludesInfo());
+      }
 
       // All the deps of the current lexer should be added as transitive includes of the previous
       // lexer.
-      if (TransitiveIncludes->find(CurLexer->myFilename) != TransitiveIncludes->end()) {
-        for (auto &it : (*TransitiveIncludes)[CurLexer->myFilename]->IncludeFilenames) {
-          (*TransitiveIncludes)[prevLexer->myFilename]->IncludeFilenames.insert(it);
-        }
+      for (auto &it : (*TransitiveIncludes)[CurLexer->myFilename]->IncludeFilenames) {
+        (*TransitiveIncludes)[prevLexer->myFilename]->IncludeFilenames.insert(it);
       }
       // Current lexer is also a transitive include of the previous lexer.
       (*TransitiveIncludes)[prevLexer->myFilename]->IncludeFilenames.insert(CurLexer->myFilename);

@@ -13,6 +13,8 @@
 #include "clang/Lex/Preprocessor.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/Path.h"
+
 using namespace clang;
 
 namespace {
@@ -26,16 +28,17 @@ class HeaderIncludesCallback : public PPCallbacks {
   bool ShowAllHeaders;
   bool ShowDepth;
   bool MSStyle;
+  Preprocessor *PP;
 
 public:
-  HeaderIncludesCallback(const Preprocessor *PP, bool ShowAllHeaders_,
+  HeaderIncludesCallback(Preprocessor *PP, bool ShowAllHeaders_,
                          raw_ostream *OutputFile_,
                          const DependencyOutputOptions &DepOpts,
                          bool OwnsOutputFile_, bool ShowDepth_, bool MSStyle_)
       : SM(PP->getSourceManager()), OutputFile(OutputFile_), DepOpts(DepOpts),
         CurrentIncludeDepth(0), HasProcessedPredefines(false),
         OwnsOutputFile(OwnsOutputFile_), ShowAllHeaders(ShowAllHeaders_),
-        ShowDepth(ShowDepth_), MSStyle(MSStyle_) {}
+        ShowDepth(ShowDepth_), MSStyle(MSStyle_), PP(PP) {}
 
   ~HeaderIncludesCallback() override {
     if (OwnsOutputFile)
@@ -50,7 +53,7 @@ public:
 
 static void PrintHeaderInfo(raw_ostream *OutputFile, StringRef Filename,
                             bool ShowDepth, unsigned CurrentIncludeDepth,
-                            bool MSStyle) {
+                            bool MSStyle, Preprocessor *PP) {
   // Write to a temporary string to avoid unnecessary flushing on errs().
   SmallString<512> Pathname(Filename);
   if (!MSStyle)
@@ -71,8 +74,10 @@ static void PrintHeaderInfo(raw_ostream *OutputFile, StringRef Filename,
   Msg += Pathname;
   Msg += '\n';
 
-  *OutputFile << Msg;
-  OutputFile->flush();
+  // llvm::outs() << Msg;
+  // llvm::outs().flush();
+  // *OutputFile << Msg;
+  // OutputFile->flush();
 }
 
 void clang::AttachHeaderIncludeGen(Preprocessor &PP,
@@ -81,6 +86,7 @@ void clang::AttachHeaderIncludeGen(Preprocessor &PP,
                                    bool ShowDepth, bool MSStyle) {
   raw_ostream *OutputFile = &llvm::errs();
   bool OwnsOutputFile = false;
+  llvm::outs() << "Attaching header include gen\n";
 
   // Choose output stream, when printing in cl.exe /showIncludes style.
   if (MSStyle) {
@@ -119,7 +125,7 @@ void clang::AttachHeaderIncludeGen(Preprocessor &PP,
   // as sanitizer blacklists. It's only important for cl.exe compatibility,
   // the GNU way to generate rules is -M / -MM / -MD / -MMD.
   for (const auto &Header : DepOpts.ExtraDeps)
-    PrintHeaderInfo(OutputFile, Header.first, ShowDepth, 2, MSStyle);
+    PrintHeaderInfo(OutputFile, Header.first, ShowDepth, 2, MSStyle, &PP);
   PP.addPPCallbacks(std::make_unique<HeaderIncludesCallback>(
       &PP, ShowAllHeaders, OutputFile, DepOpts, OwnsOutputFile, ShowDepth,
       MSStyle));
@@ -142,12 +148,26 @@ void HeaderIncludesCallback::FileChanged(SourceLocation Loc,
     if (CurrentIncludeDepth)
       --CurrentIncludeDepth;
 
+    llvm::SmallString<256> Pathname(UserLoc.getFilename());
+    llvm::sys::path::remove_dots(Pathname, true);
+    const std::string& PathnameStr = Pathname.str().str();
+  
+    llvm::outs() << "Exiting file: " << PathnameStr << " " << CurrentIncludeDepth << "\n";
+    llvm::outs().flush();
+    if (UserLoc.getFilename() != StringRef("<command line>") && CurrentIncludeDepth > 0) {
+      if (PP->TransitiveIncludes->find(PathnameStr) == PP->TransitiveIncludes->end())
+        (*(PP->TransitiveIncludes))[PathnameStr].reset(new TransitiveIncludesInfo());
+      (*(PP->TransitiveIncludes))[PathnameStr]->IsProcessingComplete = true;
+      // llvm::outs() << "Done with file: " << PathnameStr << " " << CurrentIncludeDepth << "\n";
+      // llvm::outs().flush();
+    }
+
     // We track when we are done with the predefines by watching for the first
     // place where we drop back to a nesting depth of 1.
     if (CurrentIncludeDepth == 1 && !HasProcessedPredefines) {
       if (!DepOpts.ShowIncludesPretendHeader.empty()) {
         PrintHeaderInfo(OutputFile, DepOpts.ShowIncludesPretendHeader,
-                        ShowDepth, 2, MSStyle);
+                        ShowDepth, 2, MSStyle, PP);
       }
       HasProcessedPredefines = true;
     }
@@ -178,6 +198,6 @@ void HeaderIncludesCallback::FileChanged(SourceLocation Loc,
   if (ShowHeader && Reason == PPCallbacks::EnterFile &&
       UserLoc.getFilename() != StringRef("<command line>")) {
     PrintHeaderInfo(OutputFile, UserLoc.getFilename(), ShowDepth, IncludeDepth,
-                    MSStyle);
+                    MSStyle, PP);
   }
 }

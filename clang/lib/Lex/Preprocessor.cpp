@@ -539,6 +539,9 @@ void Preprocessor::EnterMainSourceFile() {
   // If MainFileID is loaded it means we loaded an AST file, no need to enter
   // a main file.
   if (!SourceMgr.isLoadedFileID(MainFileID)) {
+    llvm::outs() << "Comes here 5.1.1\n";
+    llvm::outs().flush();
+
     // Enter the main file source buffer.
     EnterSourceFile(MainFileID, nullptr, SourceLocation(), mainSourceFilename);
 
@@ -562,8 +565,14 @@ void Preprocessor::EnterMainSourceFile() {
   assert(FID.isValid() && "Could not create FileID for predefines?");
   setPredefinesFileID(FID);
 
+  llvm::outs() << "Comes here 5.1.2\n";
+  llvm::outs().flush();
+
   // Start parsing the predefines.
   EnterSourceFile(FID, nullptr, SourceLocation(), mainSourceFilename);
+
+  llvm::outs() << "Comes here 5.1.3\n";
+  llvm::outs().flush();
 
   if (!PPOpts->PCHThroughHeader.empty()) {
     // Lookup and save the FileID for the through header. If it isn't found
@@ -588,6 +597,9 @@ void Preprocessor::EnterMainSourceFile() {
   if ((usingPCHWithThroughHeader() && SkippingUntilPCHThroughHeader) ||
       (usingPCHWithPragmaHdrStop() && SkippingUntilPragmaHdrStop))
     SkipTokensWhileUsingPCH();
+
+  llvm::outs() << "Comes here 5.1.4\n";
+  llvm::outs().flush();
 }
 
 void Preprocessor::setPCHThroughHeaderFileID(FileID FID) {
@@ -649,7 +661,6 @@ void Preprocessor::SkipTokensWhileUsingPCH() {
     }
     if (Tok.is(tok::eof) && !InPredefines) {
       ReachedMainFileEOF = true;
-      (*TransitiveIncludes)[mainSourceFilename]->IsProcessingComplete = true;
       break;
     }
     if (UsingPCHThroughHeader && !SkippingUntilPCHThroughHeader)
