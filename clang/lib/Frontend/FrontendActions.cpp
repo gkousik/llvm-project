@@ -789,10 +789,6 @@ void PreprocessOnlyAction::ExecuteAction() {
   // Ignore unknown pragmas.
   PP.IgnorePragmas();
 
-  // auto &ci = getCompilerInstance();
-  // std::string inpFilename = ci.getFrontendOpts().Inputs[0].getFile().str();
-  // PP.mainSourceFilename = inpFilename;
-
   // llvm::outs() << "Running preprocess only action\n";
   // llvm::outs().flush();
   Token Tok;
@@ -808,7 +804,7 @@ void PreprocessOnlyAction::ExecuteAction() {
   // llvm::outs() << "Comes here 5.4\n";
   // llvm::outs().flush();
   TransitiveIncludesCachePtrObj->Lock();
-  (*TransitiveIncludesCachePtrObj).cache[PP.mainSourceFilename]->IsProcessingComplete = true;
+  (*TransitiveIncludesCachePtrObj).cache[PP.mainSourceFileID]->IsProcessingComplete = true;
   TransitiveIncludesCachePtrObj->Unlock();
 }
 

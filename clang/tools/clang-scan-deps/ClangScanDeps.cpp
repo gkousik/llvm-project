@@ -22,6 +22,7 @@
 #include "llvm/Support/Threading.h"
 #include <mutex>
 #include <thread>
+#include <sstream>
 
 using namespace clang;
 using namespace tooling::dependencies;
@@ -525,7 +526,13 @@ int main(int argc, const char **argv) {
           Filename = std::move(Cmd.Filename);
           CWD = std::move(Cmd.Directory);
         }
+
+        std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
         auto MaybeFile = WorkerTools[I]->getDependencyFile(*Input, CWD);
+        std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+        llvm::outs() << "Time for " << Filename << " " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "milliseconds\n";
+        llvm::outs().flush();
+
         if (!MaybeFile) {
           HadErrors = true;
           llvm::handleAllErrors(
@@ -536,20 +543,23 @@ int main(int argc, const char **argv) {
               });
             });
         } else {
-          auto includes = Service.GetTransitiveIncludesCache();
-          std::string res = Filename;
-          if (includes->cache.find(Filename) == includes->cache.end()) {
-            res += " had error, result missing from cache\n";
-          } else {
-            res += "\n";
-            if ((*includes).cache[Filename]->IsProcessingComplete) {
-              for (auto &it : includes->cache.at(Filename)->IncludeFilenames)
-                res += it + "\n";
-            } else {
-              res = " had error, processing not complete\n";
-            }
-          }
-          DependencyOS.applyLocked([&](raw_ostream &OS) { OS << res; });
+          llvm::outs() << "Success for " << Filename << "\n";
+          // auto includes = Service.GetTransitiveIncludesCache();
+          // std::stringstream res;
+          // res << Filename;
+          // if (includes->cache.find(Filename) == includes->cache.end()) {
+          //   res << " had error, result missing from cache\n";
+          // } else {
+          //   res << "\n";
+          //   if ((*includes).cache[Filename]->IsProcessingComplete) {
+          //     res << "Num keys: " << includes->cache.at(Filename)->IncludeFilenames.size() << "\n";
+          //     for (auto &it : includes->cache.at(Filename)->IncludeFilenames)
+          //       res << it << "\n";
+          //   } else {
+          //     res << " had error, processing not complete\n";
+          //   }
+          // }
+          // DependencyOS.applyLocked([&](raw_ostream &OS) { OS << res.str(); });
         }
         // Run the tool on it.
         // if (Format == ScanningOutputFormat::Make) {
@@ -567,7 +577,11 @@ int main(int argc, const char **argv) {
       }
     });
   }
+  std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
   Pool.wait();
+  std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+  llvm::outs() << "Total time taken " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() / 1000.0 << "milliseconds\n";
+  llvm::outs().flush();
 
   if (Format == ScanningOutputFormat::Full)
     FD.printFullOutput(llvm::outs());

@@ -533,8 +533,7 @@ void Preprocessor::EnterMainSourceFile() {
   // information) and predefined macros aren't guaranteed to be set properly.
   assert(NumEnteredSourceFiles == 0 && "Cannot reenter the main file!");
   FileID MainFileID = SourceMgr.getMainFileID();
-  auto SourceFileInfo = SourceMgr.getFileEntryForID(MainFileID);
-  mainSourceFilename = SourceFileInfo->getName().str();
+  mainSourceFileID = MainFileID;
 
   // If MainFileID is loaded it means we loaded an AST file, no need to enter
   // a main file.
@@ -543,7 +542,7 @@ void Preprocessor::EnterMainSourceFile() {
     // llvm::outs().flush();
 
     // Enter the main file source buffer.
-    EnterSourceFile(MainFileID, nullptr, SourceLocation(), mainSourceFilename);
+    EnterSourceFile(MainFileID, nullptr, SourceLocation(), "");
 
     // If we've been asked to skip bytes in the main file (e.g., as part of a
     // precompiled preamble), do so now.

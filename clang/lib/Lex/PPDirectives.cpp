@@ -2243,20 +2243,26 @@ Preprocessor::ImportAction Preprocessor::HandleHeaderIncludeOrImport(
   }
 
   // If all is good, enter the new file!
-  auto fileinfo = SourceMgr.getFileEntryForID(FID);
-  auto toEnterFilename = fileinfo->tryGetRealPathName().str();
+  auto toEnterFID = FID;
+  // auto fileinfo = SourceMgr.getFileEntryForID(FID);
+  // auto toEnterFilename = fileinfo->tryGetRealPathName().str();
 
   // llvm::outs() << "Cur file: " << CurLexer->myFilename << "\n";
   // llvm::outs().flush();
 
+  std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
   TransitiveIncludes->Lock();
-  if (TransitiveIncludes->cache.find(toEnterFilename) != TransitiveIncludes->cache.end()) {
-    if ((*TransitiveIncludes).cache[toEnterFilename]->IsProcessingComplete) {
-      if (TransitiveIncludes->cache.find(CurLexer->myFilename) == TransitiveIncludes->cache.end()) {
-        (*TransitiveIncludes).cache[CurLexer->myFilename].reset(new TransitiveIncludesInfo());
+  std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+  // llvm::outs() << "Waited " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "ms for lock\n";
+  // llvm::outs().flush();
+
+  if (TransitiveIncludes->cache.find(toEnterFID) != TransitiveIncludes->cache.end()) {
+    if ((*TransitiveIncludes).cache[toEnterFID]->IsProcessingComplete) {
+      if (TransitiveIncludes->cache.find(CurLexer->FID) == TransitiveIncludes->cache.end()) {
+        (*TransitiveIncludes).cache[CurLexer->FID].reset(new TransitiveIncludesInfo());
       }
-      for (auto &it : (*TransitiveIncludes).cache[CurLexer->myFilename]->IncludeFilenames) {
-        (*TransitiveIncludes).cache[toEnterFilename]->IncludeFilenames.insert(it);
+      for (auto &it : (*TransitiveIncludes).cache[CurLexer->FID]->IncludeFilenames) {
+        (*TransitiveIncludes).cache[toEnterFID]->IncludeFilenames.insert(it);
       }
       // llvm::outs() << "Skipping entering file: " << toEnterFilename << "\n";
       // llvm::outs().flush();
@@ -2275,7 +2281,7 @@ Preprocessor::ImportAction Preprocessor::HandleHeaderIncludeOrImport(
   // llvm::outs() << "Entering file: " << toEnterFilename << "\n";
   // llvm::outs().flush();
 
-  if (EnterSourceFile(FID, CurDir, FilenameTok.getLocation(), toEnterFilename)) {
+  if (EnterSourceFile(FID, CurDir, FilenameTok.getLocation(), "")) {
     return {ImportAction::None};
   }
 

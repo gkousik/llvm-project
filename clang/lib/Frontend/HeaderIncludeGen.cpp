@@ -156,9 +156,9 @@ void HeaderIncludesCallback::FileChanged(SourceLocation Loc,
     // llvm::outs().flush();
     if (UserLoc.getFilename() != StringRef("<command line>") && CurrentIncludeDepth > 0) {
       PP->TransitiveIncludes->Lock();
-      if (PP->TransitiveIncludes->cache.find(PathnameStr) == PP->TransitiveIncludes->cache.end())
-        (*(PP->TransitiveIncludes)).cache[PathnameStr].reset(new TransitiveIncludesInfo());
-      (*(PP->TransitiveIncludes)).cache[PathnameStr]->IsProcessingComplete = true;
+      if (PP->TransitiveIncludes->cache.find(PrevFID) == PP->TransitiveIncludes->cache.end())
+        (*(PP->TransitiveIncludes)).cache[PrevFID].reset(new TransitiveIncludesInfo());
+      (*(PP->TransitiveIncludes)).cache[PrevFID]->IsProcessingComplete = true;
       PP->TransitiveIncludes->Unlock();
       // llvm::outs() << "Done with file: " << PathnameStr << " " << CurrentIncludeDepth << "\n";
       // llvm::outs().flush();

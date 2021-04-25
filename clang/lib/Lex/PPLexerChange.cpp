@@ -91,7 +91,7 @@ bool Preprocessor::EnterSourceFile(FileID FID, const DirectoryLookup *CurDir,
   }
 
   Lexer *TheLexer = new Lexer(FID, *InputFile, *this);
-  TheLexer->myFilename = filename;
+  // TheLexer->myFilename = filename;
   EnterSourceFileWithLexer(TheLexer, CurDir);
   return false;
 }
