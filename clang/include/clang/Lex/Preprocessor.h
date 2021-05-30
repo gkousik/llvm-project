@@ -47,6 +47,7 @@
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Registry.h"
 #include "llvm/Support/MD5.h"
+#include "llvm/Support/Signals.h"
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
@@ -57,6 +58,7 @@
 #include <vector>
 #include <set>
 #include <mutex>
+#include <shared_mutex>
 
 namespace llvm {
 
@@ -88,21 +90,52 @@ namespace Builtin {
 class Context;
 }
 
-struct TransitiveIncludesInfo {
-  std::set<FileID> IncludeFilenames;
-  bool IsProcessingComplete;
+class TransitiveIncludesInfo {
+  public:
+    std::set<FileID> IncludeFilenames;
+    bool IsProcessingComplete;
+
+    TransitiveIncludesInfo() {}
+
+    TransitiveIncludesInfo(const TransitiveIncludesInfo& a) {
+      IncludeFilenames = a.IncludeFilenames;
+      IsProcessingComplete = a.IsProcessingComplete;
+    }
 };
 
-struct TransitiveIncludesCache {
+// struct TransitiveIncludesInfo {
+//     std::set<FileID> IncludeFilenames;
+//     bool IsProcessingComplete;
+// };
+
+class TransitiveIncludesCache {
+  public:
   std::map<FileID, std::unique_ptr<TransitiveIncludesInfo> > cache;
 
-  std::mutex cache_mutex;
-  void Lock() {
+  std::shared_timed_mutex cache_mutex;
+  void RWLock() {
     cache_mutex.lock();
   }
-  void Unlock() {
+  void RWUnlock() {
     cache_mutex.unlock();
   }
+  void RLock() {
+    cache_mutex.lock_shared();
+  }
+  void RUnlock() {
+    cache_mutex.unlock_shared();
+  }
+
+  TransitiveIncludesCache() {
+    llvm::outs() << "new transitive includes cache\n";
+    llvm::sys::PrintStackTrace(llvm::outs());
+    llvm::outs().flush();
+  }
+
+  // TransitiveIncludesCache(const TransitiveIncludesCache& a) {
+  //   cache = a.cache;
+  //   llvm::outs() << "TransitiveIncludesCache copy constructor called\n";
+  // }
 };
 
 typedef std::shared_ptr<TransitiveIncludesCache> TransitiveIncludesCachePtr;
@@ -2098,28 +2131,34 @@ private:
   }
 
   void PopIncludeMacroStack() {
+// tccacheenable
+#if 1
     if (CurLexer) {
       auto &prevLexer = IncludeMacroStack.back().TheLexer;
       // llvm::outs() << "PrevLexer filename: " << prevLexer->myFilename << "-\n";
       // llvm::outs() << "Curlexer filename: " << CurLexer->myFilename << "-\n";
 
-      TransitiveIncludes->Lock();
+      TransitiveIncludes->RLock();
       if (TransitiveIncludes->cache.find(prevLexer->FID) == TransitiveIncludes->cache.end()) {
         (*TransitiveIncludes).cache[prevLexer->FID].reset(new TransitiveIncludesInfo());
       }
       if (TransitiveIncludes->cache.find(CurLexer->FID) == TransitiveIncludes->cache.end()) {
         (*TransitiveIncludes).cache[CurLexer->FID].reset(new TransitiveIncludesInfo());
       }
+      TransitiveIncludes->RUnlock();
 
       // All the deps of the current lexer should be added as transitive includes of the previous
       // lexer.
-      for (auto &it : (*TransitiveIncludes).cache[CurLexer->FID]->IncludeFilenames) {
-        (*TransitiveIncludes).cache[prevLexer->FID]->IncludeFilenames.insert(it);
-      }
+      // for (auto &it : (*TransitiveIncludes).cache[CurLexer->FID]->IncludeFilenames) {
+      //   (*TransitiveIncludes).cache[prevLexer->FID]->IncludeFilenames.insert(it);
+      // }
+
       // Current lexer is also a transitive include of the previous lexer.
+      TransitiveIncludes->RWLock();
       (*TransitiveIncludes).cache[prevLexer->FID]->IncludeFilenames.insert(CurLexer->FID);
-      TransitiveIncludes->Unlock();
+      TransitiveIncludes->RWUnlock();
     }
+#endif
     CurLexer = std::move(IncludeMacroStack.back().TheLexer);
     CurPPLexer = IncludeMacroStack.back().ThePPLexer;
     CurTokenLexer = std::move(IncludeMacroStack.back().TheTokenLexer);

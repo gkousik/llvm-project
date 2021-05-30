@@ -154,15 +154,18 @@ void HeaderIncludesCallback::FileChanged(SourceLocation Loc,
   
     // llvm::outs() << "Exiting file: " << PathnameStr << " " << CurrentIncludeDepth << "\n";
     // llvm::outs().flush();
+// tccacheenable
+#if 1
     if (UserLoc.getFilename() != StringRef("<command line>") && CurrentIncludeDepth > 0) {
-      PP->TransitiveIncludes->Lock();
+      PP->TransitiveIncludes->RWLock();
       if (PP->TransitiveIncludes->cache.find(PrevFID) == PP->TransitiveIncludes->cache.end())
         (*(PP->TransitiveIncludes)).cache[PrevFID].reset(new TransitiveIncludesInfo());
       (*(PP->TransitiveIncludes)).cache[PrevFID]->IsProcessingComplete = true;
-      PP->TransitiveIncludes->Unlock();
+      PP->TransitiveIncludes->RWUnlock();
       // llvm::outs() << "Done with file: " << PathnameStr << " " << CurrentIncludeDepth << "\n";
       // llvm::outs().flush();
     }
+#endif
 
     // We track when we are done with the predefines by watching for the first
     // place where we drop back to a nesting depth of 1.

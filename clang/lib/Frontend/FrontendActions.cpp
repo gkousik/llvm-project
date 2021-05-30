@@ -803,9 +803,12 @@ void PreprocessOnlyAction::ExecuteAction() {
   } while (Tok.isNot(tok::eof));
   // llvm::outs() << "Comes here 5.4\n";
   // llvm::outs().flush();
-  TransitiveIncludesCachePtrObj->Lock();
+// tccacheenable
+#if 1
+  TransitiveIncludesCachePtrObj->RWLock();
   (*TransitiveIncludesCachePtrObj).cache[PP.mainSourceFileID]->IsProcessingComplete = true;
-  TransitiveIncludesCachePtrObj->Unlock();
+  TransitiveIncludesCachePtrObj->RWUnlock();
+#endif
 }
 
 void PrintPreprocessedAction::ExecuteAction() {

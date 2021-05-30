@@ -2250,24 +2250,27 @@ Preprocessor::ImportAction Preprocessor::HandleHeaderIncludeOrImport(
   // llvm::outs() << "Cur file: " << CurLexer->myFilename << "\n";
   // llvm::outs().flush();
 
+// tccacheenable
+#if 1
   std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
-  TransitiveIncludes->Lock();
+  TransitiveIncludes->RLock();
   std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
   // llvm::outs() << "Waited " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "ms for lock\n";
   // llvm::outs().flush();
 
   if (TransitiveIncludes->cache.find(toEnterFID) != TransitiveIncludes->cache.end()) {
     if ((*TransitiveIncludes).cache[toEnterFID]->IsProcessingComplete) {
-      if (TransitiveIncludes->cache.find(CurLexer->FID) == TransitiveIncludes->cache.end()) {
-        (*TransitiveIncludes).cache[CurLexer->FID].reset(new TransitiveIncludesInfo());
-      }
-      for (auto &it : (*TransitiveIncludes).cache[CurLexer->FID]->IncludeFilenames) {
-        (*TransitiveIncludes).cache[toEnterFID]->IncludeFilenames.insert(it);
-      }
+      // if (TransitiveIncludes->cache.find(CurLexer->FID) == TransitiveIncludes->cache.end()) {
+      //   (*TransitiveIncludes).cache[CurLexer->FID].reset(new TransitiveIncludesInfo());
+      // }
+      // for (auto &it : (*TransitiveIncludes).cache[CurLexer->FID]->IncludeFilenames) {
+      //   (*TransitiveIncludes).cache[toEnterFID]->IncludeFilenames.insert(it);
+      // }
+
       // llvm::outs() << "Skipping entering file: " << toEnterFilename << "\n";
       // llvm::outs().flush();
 
-      TransitiveIncludes->Unlock();
+      TransitiveIncludes->RUnlock();
       return {ImportAction::None};
       // llvm::outs() << "===========\nTransitive includes before entering source file " << toEnterFilename << "\n";
       // for (auto &it : (*TransitiveIncludes)[toEnterFilename]->IncludeFilenames)
@@ -2276,7 +2279,8 @@ Preprocessor::ImportAction Preprocessor::HandleHeaderIncludeOrImport(
       // llvm::outs().flush();
     }
   }
-  TransitiveIncludes->Unlock();
+  TransitiveIncludes->RUnlock();
+#endif 
 
   // llvm::outs() << "Entering file: " << toEnterFilename << "\n";
   // llvm::outs().flush();
